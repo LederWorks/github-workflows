@@ -1,0 +1,281 @@
+# .github/workflows/terraform_execute.yml
+name: terraform_execute
+
+on:
+  workflow_call:
+    inputs:
+      #GitHub Owner
+      github_owner:
+        required: true
+        type: string
+        description: 'Either the GitHub username or organization name.'
+
+      #Runner
+      runner:
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+        description: 'Either the type of runner or the label of the self hosted runner to be used. Defaults to ubuntu-latest.'
+
+      #Terraform Infra Repository
+      infra_repo:
+        required: true
+        type: string
+        description: 'Name of the Terraform Infra Repository where HCL code resides.'
+
+      infra_repo_ref:
+        required: false
+        type: string
+        default: main
+        description: 'The branch, tag or commit SHA to checkout. Defaults to main.'
+
+      #Terraform Config Repository
+      config_repo:
+        required: false
+        type: string
+        default: ''
+        description: 'Name of the Terraform Config Repository where JSON configurations resides.'
+
+      config_repo_ref:
+        required: false
+        type: string
+        default: main
+        description: 'The branch, tag or commit SHA to checkout. Defaults to main.'
+
+      #Terraform Configuration
+      terraform_directory:
+        required: true
+        type: string
+        description: 'The path to the Terraform configuration relative to infra-repo/terraform directory.'
+
+      config_directory:
+        required: false
+        type: string
+        default: ''
+        description: 'The path to the tfvars configuration relative to infra-repo/config, infra-repo/config_override and config-repo/config directories.'
+
+      #Terraform Action
+      action:
+        required: false
+        type: string
+        default: 'plan'
+        description: 'The action to be performed by the Terraform workflow. Either plan apply or destroy.'
+
+      #Terraform Setup
+      terraform_version:
+        required: false
+        type: string
+        default: 1.9.8
+        description: 'The version of Terraform to be used.'
+
+      terraform_wrapper:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use the Terraform Wrapper or not.'
+
+      #Terraform Backend Type
+      backend_type:
+        required: true
+        type: string
+        description: 'Type of the backend to use. Valid values are "azure", "s3" and "pg".'
+
+      #Azure Backend
+      azure_backend_snapshot:
+        required: false
+        type: boolean
+        default: true
+        description: 'Set ARM_SNAPSHOT for Azure Backend.'
+
+      azure_backend_use_azuread:
+        required: false
+        type: boolean
+        default: true
+        description: 'Set ARM_USE_AZUREAD for Azure Backend.'
+
+      #Terraform Providers
+      provider_azurerm:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to set up the Azure Provider or not.'
+
+      provider_github:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to set up the GitHub Provider or not.'
+
+      #Checkov
+      checkov_scan:
+        required: false
+        type: boolean
+        default: false
+        description: 'Set to true to run Checkov security scan.'
+
+    secrets:
+      #GitHub PAT
+      github_pat:
+        required: true
+        description: 'GitHub Personal Access Token with access to the repositories.'
+
+      #Azure
+      azure_tenant_id:
+        required: false
+        description: 'Set ARM_TENANT_ID for Azure authentication.'
+
+      azure_subscription_id:
+        required: false
+        description: 'Set ARM_SUBSCRIPTION_ID for Azure authentication.'
+
+      azure_client_id:
+        required: false
+        description: 'Set ARM_CLIENT_ID for Azure authentication.'
+
+      azure_client_secret:
+        required: false
+        description: 'Set ARM_CLIENT_SECRET for Azure authentication. Not required when using OIDC.'
+
+      #Azure Backend
+      azure_backend_resource_group:
+        required: false
+        description: 'Resource Group for Azure Storage Account.'
+
+      azure_backend_storage_account:
+        required: false
+        description: 'Name for Azure Storage Account.'
+
+      azure_backend_storage_container:
+        required: false
+        description: 'Blob Container for Azure Storage Container.'
+
+      azure_backend_storage_key:
+        required: false
+        description: 'State file path for Azure Storage Account.'
+
+jobs:
+
+  #  $$$$$$\   $$$$$$\  $$\   $$\ $$$$$$$$\ $$$$$$\  $$$$$$\
+  # $$  __$$\ $$  __$$\ $$$\  $$ |$$  _____|\_$$  _|$$  __$$\
+  # $$ /  \__|$$ /  $$ |$$$$\ $$ |$$ |        $$ |  $$ /  \__|
+  # $$ |      $$ |  $$ |$$ $$\$$ |$$$$$\      $$ |  $$ |$$$$\
+  # $$ |      $$ |  $$ |$$ \$$$$ |$$  __|     $$ |  $$ |\_$$ |
+  # $$ |  $$\ $$ |  $$ |$$ |\$$$ |$$ |        $$ |  $$ |  $$ |
+  # \$$$$$$  | $$$$$$  |$$ | \$$ |$$ |      $$$$$$\ \$$$$$$  |
+  #  \______/  \______/ \__|  \__|\__|      \______| \______/
+
+  terraform_config:
+    if: ${{ inputs.config_directory != '' }}
+    uses: ./.github/workflows/terraform_step_config.yml
+    with:
+      runner: ${{ inputs.runner }}
+      infra_repo: ${{ inputs.infra_repo }}
+      infra_repo_ref: ${{ inputs.infra_repo_ref }}
+      config_repo: ${{ inputs.config_repo }}
+      config_repo_ref: ${{ inputs.config_repo_ref }}
+      config_directory: ${{ inputs.config_directory }}
+      github_owner: ${{ inputs.github_owner }}
+    secrets:
+      #GitHub PAT
+      github_pat: ${{ secrets.github_pat }}
+
+  # $$$$$$$\  $$\        $$$$$$\  $$\   $$\
+  # $$  __$$\ $$ |      $$  __$$\ $$$\  $$ |
+  # $$ |  $$ |$$ |      $$ /  $$ |$$$$\ $$ |
+  # $$$$$$$  |$$ |      $$$$$$$$ |$$ $$\$$ |
+  # $$  ____/ $$ |      $$  __$$ |$$ \$$$$ |
+  # $$ |      $$ |      $$ |  $$ |$$ |\$$$ |
+  # $$ |      $$$$$$$$\ $$ |  $$ |$$ | \$$ |
+  # \__|      \________|\__|  \__|\__|  \__|
+
+  terraform_plan:
+    uses: ./.github/workflows/terraform_step_plan.yml
+    needs: terraform_config
+    with:
+      runner: ${{ inputs.runner }}
+      terraform_directory: ${{ inputs.terraform_directory }}
+      backend_type: ${{ inputs.backend_type }}
+      github_owner: ${{ inputs.github_owner }}
+      terraform_version: ${{ inputs.terraform_version }}
+      terraform_wrapper: ${{ inputs.terraform_wrapper }}
+      #Terraform Providers
+      provider_azurerm: ${{ inputs.provider_azurerm }}
+      provider_github: ${{ inputs.provider_github }}
+      #Azure Backend
+      azure_backend_snapshot: ${{ inputs.azure_backend_snapshot }}
+      azure_backend_use_azuread: ${{ inputs.azure_backend_use_azuread }}
+    secrets:
+      #GitHub PAT
+      github_pat: ${{ secrets.github_pat }}
+      #Azure
+      azure_tenant_id: ${{ secrets.azure_tenant_id }}
+      azure_subscription_id: ${{ secrets.azure_subscription_id }}
+      azure_client_id: ${{ secrets.azure_client_id }}
+      azure_client_secret: ${{ secrets.azure_client_secret }}
+      #Azure Backend
+      azure_backend_resource_group: ${{ secrets.azure_backend_resource_group }}
+      azure_backend_storage_account: ${{ secrets.azure_backend_storage_account }}
+      azure_backend_storage_container: ${{ secrets.azure_backend_storage_container }}
+      azure_backend_storage_key: ${{ secrets.azure_backend_storage_key }}
+
+  #  $$$$$$\  $$\   $$\ $$$$$$$$\  $$$$$$\  $$\   $$\  $$$$$$\  $$\    $$\
+  # $$  __$$\ $$ |  $$ |$$  _____|$$  __$$\ $$ | $$  |$$  __$$\ $$ |   $$ |
+  # $$ /  \__|$$ |  $$ |$$ |      $$ /  \__|$$ |$$  / $$ /  $$ |$$ |   $$ |
+  # $$ |      $$$$$$$$ |$$$$$\    $$ |      $$$$$  /  $$ |  $$ |\$$\  $$  |
+  # $$ |      $$  __$$ |$$  __|   $$ |      $$  $$<   $$ |  $$ | \$$\$$  /
+  # $$ |  $$\ $$ |  $$ |$$ |      $$ |  $$\ $$ |\$$\  $$ |  $$ |  \$$$  /
+  # \$$$$$$  |$$ |  $$ |$$$$$$$$\ \$$$$$$  |$$ | \$$\  $$$$$$  |   \$  /
+  #  \______/ \__|  \__|\________| \______/ \__|  \__| \______/     \_/
+
+  terraform_scan:
+    uses:  ./.github/workflows/terraform_step_scan.yml
+    needs: terraform_plan
+    if: ${{ inputs.checkov_scan }}
+    with:
+      runner: ${{ inputs.runner }}
+      terraform_directory: ${{ inputs.terraform_directory }}
+      github_owner: ${{ inputs.github_owner }}
+    secrets:
+      #GitHub PAT
+      github_pat: ${{ secrets.github_pat }}
+
+
+  #  $$$$$$\  $$$$$$$\  $$$$$$$\  $$\   $$\     $$\
+  # $$  __$$\ $$  __$$\ $$  __$$\ $$ |  \$$\   $$  |
+  # $$ /  $$ |$$ |  $$ |$$ |  $$ |$$ |   \$$\ $$  /
+  # $$$$$$$$ |$$$$$$$  |$$$$$$$  |$$ |    \$$$$  /
+  # $$  __$$ |$$  ____/ $$  ____/ $$ |     \$$  /
+  # $$ |  $$ |$$ |      $$ |      $$ |      $$ |
+  # $$ |  $$ |$$ |      $$ |      $$$$$$$$\ $$ |
+  # \__|  \__|\__|      \__|      \________|\__|
+
+  terraform_apply:
+    uses: ./.github/workflows/terraform_step_apply.yml
+    needs: [terraform_plan, terraform_scan]
+    if: ${{ always() && (needs.terraform_scan.result == 'success' || !inputs.checkov_scan) }}
+    with:
+      runner: ${{ inputs.runner }}
+      terraform_directory: ${{ inputs.terraform_directory }}
+      backend_type: ${{ inputs.backend_type }}
+      github_owner: ${{ inputs.github_owner }}
+      terraform_version: ${{ inputs.terraform_version }}
+      terraform_wrapper: ${{ inputs.terraform_wrapper }}
+      #Terraform Providers
+      provider_azurerm: ${{ inputs.provider_azurerm }}
+      provider_github: ${{ inputs.provider_github }}
+      #Azure Backend
+      azure_backend_snapshot: ${{ inputs.azure_backend_snapshot }}
+      azure_backend_use_azuread: ${{ inputs.azure_backend_use_azuread }}
+    secrets:
+      #GitHub PAT
+      github_pat: ${{ secrets.github_pat }}
+      #Azure
+      azure_tenant_id: ${{ secrets.azure_tenant_id }}
+      azure_subscription_id: ${{ secrets.azure_subscription_id }}
+      azure_client_id: ${{ secrets.azure_client_id }}
+      azure_client_secret: ${{ secrets.azure_client_secret }}
+      #Azure Backend
+      azure_backend_resource_group: ${{ secrets.azure_backend_resource_group }}
+      azure_backend_storage_account: ${{ secrets.azure_backend_storage_account }}
+      azure_backend_storage_container: ${{ secrets.azure_backend_storage_container }}
+      azure_backend_storage_key: ${{ secrets.azure_backend_storage_key }}

@@ -1,0 +1,183 @@
+# .github/steps/terraform_step_plan.yml
+name: terraform_step_plan
+
+on:
+  workflow_call:
+    inputs:
+      #Runner
+      runner:
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+
+      #GitHub Owner
+      github_owner:
+        required: true
+        type: string
+
+      #Terraform Configuration
+      terraform_directory:
+        required: true
+        type: string
+
+      #Terraform Setup
+      terraform_version:
+        required: false
+        type: string
+        default: 1.9.8
+
+      terraform_wrapper:
+        required: false
+        type: boolean
+        default: false
+
+      #Terraform Providers
+      provider_azurerm:
+        required: false
+        type: boolean
+        default: false
+
+      provider_github:
+        required: false
+        type: boolean
+        default: false
+
+      #Terraform Backend Type
+      backend_type:
+        required: true
+        type: string
+
+      #Azure Backend
+      azure_backend_snapshot:
+        required: false
+        type: boolean
+        default: true
+
+      azure_backend_use_azuread:
+        required: false
+        type: boolean
+        default: true
+
+    secrets:
+      #GitHub PAT
+      github_pat:
+        required: true
+
+      #Azure
+      azure_tenant_id:
+        required: false
+      azure_subscription_id:
+        required: false
+      azure_client_id:
+        required: false
+      azure_client_secret:
+        required: false
+
+      #Azure Backend
+      azure_backend_resource_group:
+        required: false
+      azure_backend_storage_account:
+        required: false
+      azure_backend_storage_container:
+        required: false
+      azure_backend_storage_key:
+        required: false
+
+jobs:
+  tf_step_plan:
+    runs-on: ${{ inputs.runner }}
+    name: Plan Terraform Configuration
+    steps:
+      - name: Set GitHub environment variables
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.github_pat }}" >> $GITHUB_ENV
+          echo "GITHUB_OWNER=${{ inputs.github_owner }}" >> $GITHUB_ENV
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+          terraform_wrapper: ${{ inputs.terraform_wrapper }}
+
+      - name: Download Variables File
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-tfvars
+          path: terraform/${{ inputs.terraform_directory }}
+# Init starts here
+      - name: Set Azure backend environment variables
+        if: inputs.backend_type == 'azure'
+        run: |
+          echo "ARM_SNAPSHOT=${{ inputs.azure_backend_snapshot }}" >> $GITHUB_ENV
+          echo "ARM_USE_AZUREAD=${{ inputs.azure_backend_use_azuread }}" >> $GITHUB_ENV
+
+      - name: Set Azure environment variables
+        if: inputs.backend_type == 'azure' || inputs.provider_azurerm == true
+        run: |
+          echo "ARM_TENANT_ID=${{ secrets.azure_tenant_id }}" >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=${{ secrets.azure_subscription_id }}" >> $GITHUB_ENV
+          echo "ARM_CLIENT_ID=${{ secrets.azure_client_id }}" >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=${{ secrets.azure_client_secret }}" >> $GITHUB_ENV
+
+      - name: Login to Azure CLI
+        if: inputs.backend_type == 'azure'
+        run: az login --service-principal --username ${{ secrets.azure_client_id }} --password ${{ secrets.azure_client_secret }} --tenant ${{ secrets.azure_tenant_id }}  
+
+      - name: Terraform Init with Azure backend
+        if: inputs.backend_type == 'azure'
+        id: init_azure_backend
+        working-directory: terraform/${{ inputs.terraform_directory }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.azure_backend_resource_group }}" \
+            -backend-config="storage_account_name=${{ secrets.azure_backend_storage_account }}" \
+            -backend-config="container_name=${{ secrets.azure_backend_storage_container }}" \
+            -backend-config="key=${{ secrets.azure_backend_storage_key }}"
+# Init ends here
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform/${{ inputs.terraform_directory }}
+        run: |
+          terraform plan -no-color -out=plan_output.tfplan | tee plan_output.txt
+
+      - name: Convert Plan to JSON
+        id: plan_to_json
+        working-directory: terraform/${{ inputs.terraform_directory }}
+        run: |
+          terraform show -json plan_output.tfplan > plan_output.json
+
+      - name: Upload Plan JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-json
+          path: terraform/${{ inputs.terraform_directory }}/plan_output.json
+
+      - name: Upload Plan File
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-file
+          path: terraform/${{ inputs.terraform_directory }}/plan_output.tfplan
+
+      - name: Comment Plan Output
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.github_pat }}
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('${{ github.workspace }}/terraform/${{ inputs.terraform_directory }}/plan_output.txt', 'utf8');
+            const output = `
+              <details>
+              <summary>terraform/${{ inputs.terraform_directory }} - Terraform Plan Output (click to expand)</summary>
+              \n\`\`\`\n${planOutput}\n\`\`\`
+              </details>
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });

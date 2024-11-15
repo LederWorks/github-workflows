@@ -1,0 +1,28 @@
+name: Terraform Execute Azure
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "core/**"
+  issue_comment:
+    types: [created]
+
+jobs:
+  call_terraform_init_plan_apply:
+    uses: LederWorks/github-workflows/.github/workflows/terraform_execute.yml@v1
+    with:
+      backend_type: azure
+      config_directory: core
+      # checkov_scan: true
+      github_owner: ${{ vars.GH_ORG }}
+    secrets:
+      azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+      azure_backend_resource_group: ${{ secrets.AZURE_BACKEND_RESOURCE_GROUP }}
+      azure_backend_storage_account: ${{ secrets.AZURE_BACKEND_STORAGE_ACCOUNT }}
+      azure_backend_storage_container: "tfstate-config-github"
+      azure_backend_storage_key: "github-core.tfstate"
+      github_pat: ${{ secrets.GH_PAT }}
