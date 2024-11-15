@@ -166,7 +166,7 @@ jobs:
 
   terraform_config:
     if: ${{ inputs.config_directory != '' }}
-    uses: ./.github/steps/terraform_step_config.yml
+    uses: ./.github/workflows/terraform_step_config.yml@v1
     with:
       runner: ${{ inputs.runner }}
       infra_repo: ${{ inputs.infra_repo }}
@@ -189,7 +189,7 @@ jobs:
   # \__|      \________|\__|  \__|\__|  \__|
 
   terraform_plan:
-    uses: ./.github/steps/terraform_step_plan.yml
+    uses: ./.github/steps/terraform_step_plan.yml@v1
     needs: terraform_config
     with:
       runner: ${{ inputs.runner }}
@@ -228,7 +228,7 @@ jobs:
   #  \______/ \__|  \__|\________| \______/ \__|  \__| \______/     \_/
 
   terraform_scan:
-    uses:  ./.github/workflows/terraform_step_scan.yml
+    uses:  ./.github/workflows/terraform_step_scan.yml@v1
     needs: terraform_plan
     if: ${{ inputs.checkov_scan }}
     with:
@@ -250,7 +250,7 @@ jobs:
   # \__|  \__|\__|      \__|      \________|\__|
 
   terraform_apply:
-    uses: ./.github/steps/terraform_step_apply.yml
+    uses: ./.github/steps/terraform_step_apply.yml@v1
     needs: [terraform_plan, terraform_scan]
     if: ${{ always() && (needs.terraform_scan.result == 'success' || !inputs.checkov_scan) }}
     with:
