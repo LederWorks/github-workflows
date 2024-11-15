@@ -88,6 +88,20 @@ jobs:
     runs-on: ${{ inputs.runner }}
     name: Apply Terraform Configuration
     steps:
+      - name: Set GitHub environment variables
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.github_pat }}" >> $GITHUB_ENV
+          echo "GITHUB_OWNER=${{ inputs.github_owner }}" >> $GITHUB_ENV
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+          terraform_wrapper: ${{ inputs.terraform_wrapper }}
+# Init starts here
       - name: Set Azure backend environment variables
         if: inputs.backend_type == 'azure'
         run: |
@@ -102,24 +116,10 @@ jobs:
           echo "ARM_CLIENT_ID=${{ secrets.azure_client_id }}" >> $GITHUB_ENV
           echo "ARM_CLIENT_SECRET=${{ secrets.azure_client_secret }}" >> $GITHUB_ENV
 
-      - name: Set GitHub environment variables
-        run: |
-          echo "GITHUB_TOKEN=${{ secrets.github_pat }}" >> $GITHUB_ENV
-          echo "GITHUB_OWNER=${{ inputs.github_owner }}" >> $GITHUB_ENV
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ inputs.terraform_version }}
-          terraform_wrapper: ${{ inputs.terraform_wrapper }}
-
       - name: Login to Azure CLI
         if: inputs.backend_type == 'azure'
         run: az login --service-principal --username ${{ secrets.azure_client_id }} --password ${{ secrets.azure_client_secret }} --tenant ${{ secrets.azure_tenant_id }}
-
+# Optional plan download when used before apply
       - name: Download Plan File
         uses: actions/download-artifact@v4
         with:
@@ -136,7 +136,7 @@ jobs:
             -backend-config="storage_account_name=${{ secrets.azure_backend_storage_account }}" \
             -backend-config="container_name=${{ secrets.azure_backend_storage_container }}" \
             -backend-config="key=${{ secrets.azure_backend_storage_key }}"
-
+# Init ends here
       - name: Terraform Apply
         id: apply
         working-directory: terraform/${{ inputs.terraform_directory }}

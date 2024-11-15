@@ -1,49 +1,49 @@
 # actions/terraform_init/action.yaml
 
-name: 'Terraform Init'
-description: 'Initialize Terraform configuration'
-inputs:
-  terraform_directory:
-    required: true
-    description: 'The directory containing the Terraform configuration'
-  backend_type:
-    required: true
-    description: 'The type of backend to use'
-  azure_backend_resource_group:
-    required: false
-    description: 'Azure resource group for backend'
-  azure_backend_storage_account:
-    required: false
-    description: 'Azure storage account for backend'
-  azure_backend_storage_container:
-    required: false
-    description: 'Azure storage container for backend'
-  azure_backend_storage_key:
-    required: false
-    description: 'Azure storage key for backend'
-secrets:
-  azure_client_id:
-    required: false
-  azure_client_secret:
-    required: false
-  azure_tenant_id:
-    required: false
-runs:
-  using: 'composite'
-  steps:
-    - name: Set Azure environment variables
-      if: ${{ inputs.backend_type == 'azure' }}
-      run: |
-        echo "ARM_TENANT_ID=${{ secrets.azure_tenant_id }}" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=${{ secrets.azure_subscription_id }}" >> $GITHUB_ENV
-        echo "ARM_CLIENT_ID=${{ secrets.azure_client_id }}" >> $GITHUB_ENV
-        echo "ARM_CLIENT_SECRET=${{ secrets.azure_client_secret }}" >> $GITHUB_ENV
-    - name: Terraform Init
-      id: init
-      working-directory: ${{ inputs.terraform_directory }}
-      run: |
-        terraform init \
-          -backend-config="resource_group_name=${{ inputs.azure_backend_resource_group }}" \
-          -backend-config="storage_account_name=${{ inputs.azure_backend_storage_account }}" \
-          -backend-config="container_name=${{ inputs.azure_backend_storage_container }}" \
-          -backend-config="key=${{ inputs.azure_backend_storage_key }}"
+# name: 'Terraform Init'
+# description: 'Initialize Terraform configuration'
+# inputs:
+#   terraform_directory:
+#     required: true
+#     description: 'The directory containing the Terraform configuration'
+#   backend_type:
+#     required: true
+#     description: 'The type of backend to use'
+#   azure_backend_resource_group:
+#     required: false
+#     description: 'Azure resource group for backend'
+#   azure_backend_storage_account:
+#     required: false
+#     description: 'Azure storage account for backend'
+#   azure_backend_storage_container:
+#     required: false
+#     description: 'Azure storage container for backend'
+#   azure_backend_storage_key:
+#     required: false
+#     description: 'Azure storage key for backend'
+# secrets:
+#   azure_client_id:
+#     required: false
+#   azure_client_secret:
+#     required: false
+#   azure_tenant_id:
+#     required: false
+# runs:
+#   using: 'composite'
+#   steps:
+#     - name: Set Azure environment variables
+#       if: ${{ inputs.backend_type == 'azure' }}
+#       run: |
+#         echo "ARM_TENANT_ID=${{ secrets.azure_tenant_id }}" >> $GITHUB_ENV
+#         echo "ARM_SUBSCRIPTION_ID=${{ secrets.azure_subscription_id }}" >> $GITHUB_ENV
+#         echo "ARM_CLIENT_ID=${{ secrets.azure_client_id }}" >> $GITHUB_ENV
+#         echo "ARM_CLIENT_SECRET=${{ secrets.azure_client_secret }}" >> $GITHUB_ENV
+#     - name: Terraform Init
+#       id: init
+#       working-directory: ${{ inputs.terraform_directory }}
+#       run: |
+#         terraform init \
+#           -backend-config="resource_group_name=${{ inputs.azure_backend_resource_group }}" \
+#           -backend-config="storage_account_name=${{ inputs.azure_backend_storage_account }}" \
+#           -backend-config="container_name=${{ inputs.azure_backend_storage_container }}" \
+#           -backend-config="key=${{ inputs.azure_backend_storage_key }}"
