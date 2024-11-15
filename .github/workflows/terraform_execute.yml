@@ -114,7 +114,6 @@ on:
         description: 'Set to true to run Checkov security scan.'
 
     secrets:
-
       #GitHub PAT
       github_pat:
         required: true

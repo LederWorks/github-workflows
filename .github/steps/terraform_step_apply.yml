@@ -101,6 +101,12 @@ jobs:
         with:
           terraform_version: ${{ inputs.terraform_version }}
           terraform_wrapper: ${{ inputs.terraform_wrapper }}
+
+      - name: Download Plan File
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-file
+          path: terraform/${{ inputs.terraform_directory }}
 # Init starts here
       - name: Set Azure backend environment variables
         if: inputs.backend_type == 'azure'
@@ -119,12 +125,6 @@ jobs:
       - name: Login to Azure CLI
         if: inputs.backend_type == 'azure'
         run: az login --service-principal --username ${{ secrets.azure_client_id }} --password ${{ secrets.azure_client_secret }} --tenant ${{ secrets.azure_tenant_id }}
-# Optional plan download when used before apply
-      - name: Download Plan File
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-file
-          path: terraform/${{ inputs.terraform_directory }}
 
       - name: Terraform Init with Azure backend
         if: inputs.backend_type == 'azure'
